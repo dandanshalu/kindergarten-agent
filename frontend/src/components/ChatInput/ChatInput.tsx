@@ -55,7 +55,7 @@ export default function ChatInput({
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+    <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
       <TextArea
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -63,7 +63,7 @@ export default function ChatInput({
         placeholder={placeholder}
         autoSize={{ minRows: 2, maxRows: 6 }}
         disabled={disabled || loading}
-        style={{ flex: 1 }}
+        style={{ flex: 1, borderRadius: 8 }}
       />
       <Button
         type="primary"
@@ -71,6 +71,7 @@ export default function ChatInput({
         onClick={() => handleSubmit()}
         loading={loading}
         disabled={!value.trim() || disabled}
+        style={{ borderRadius: 8, height: 40 }}
       >
         发送
       </Button>

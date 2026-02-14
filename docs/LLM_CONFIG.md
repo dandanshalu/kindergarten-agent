@@ -1,6 +1,6 @@
 # 大模型底座配置说明
 
-本文档说明如何配置项目使用的大模型底座。项目采用 OpenAI 兼容的 Chat Completions API，可无缝切换多种 LLM 服务。
+本文档说明如何配置项目使用的大模型底座。后端通过 **LangChain4j**（`langchain4j-open-ai`）调用 OpenAI 兼容的 Chat Completions API，可无缝切换多种 LLM 服务。
 
 ## 默认配置：DeepSeek
 
@@ -81,9 +81,11 @@ kindergarten:
 
 | 配置项 | 说明 | 示例 |
 |--------|------|------|
-| kindergarten.llm.base-url | LLM API 地址，需包含到 `/v1` 前的域名 | `https://api.deepseek.com` |
+| kindergarten.llm.base-url | LLM API 地址；LangChain4j 会自动在末尾补 `/v1`（若未带） | `https://api.deepseek.com` |
 | kindergarten.llm.api-key | API 密钥 | `sk-xxxx` |
 | kindergarten.llm.model | 模型名称 | `deepseek-chat` |
+
+**说明**：`LlmConfig` 会据此创建 `OpenAiChatModel` 与 `OpenAiStreamingChatModel`，DeepSeek/通义等已设置 `accumulateToolCallId(false)`。
 
 ---
 

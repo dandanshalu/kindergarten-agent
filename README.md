@@ -4,7 +4,7 @@
 
 ## 技术栈
 
-- **后端**：Java 21 + Spring Boot 3.2 + WebFlux（调用 OpenAI 兼容 API）
+- **后端**：Java 21 + Spring Boot 3.2 + LangChain4j（调用 OpenAI 兼容 API，如 DeepSeek/通义）+ Logback（控制台 + 日志文件）
 - **前端**：React 18 + TypeScript + Vite + Ant Design 5
 
 ## 快速启动
@@ -31,7 +31,7 @@ cd backend
 ./mvnw spring-boot:run
 ```
 
-后端默认在 http://localhost:8080 启动。
+后端默认在 http://localhost:8080 启动。日志同时输出到控制台和按日滚动文件（默认路径：系统临时目录下的 `kindergarten-agent/app.log`，可通过环境变量 `LOG_PATH` 或 `LOG_FILE` 修改，详见 [后端技术规格](docs/BACKEND_SPEC.md) 第 8.3 节）。
 
 ### 3. 启动前端
 
@@ -57,9 +57,10 @@ kindergarten-agent/
 │   │   ├── controller/      # API 控制器
 │   │   ├── dto/             # 请求/响应 DTO（使用 Java Record）
 │   │   ├── service/         # LLM 调用服务
-│   │   └── config/          # CORS、WebClient 等配置
+│   │   └── config/          # CORS、LangChain4j（LLM）等配置
 │   └── src/main/resources/
-│       └── application.yml
+│       ├── application.yml
+│       └── logback-spring.xml   # 日志：控制台 + 按日滚动文件
 ├── frontend/                # React 前端
 │   └── src/
 │       ├── api/             # API 封装

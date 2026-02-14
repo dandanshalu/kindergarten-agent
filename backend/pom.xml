@@ -26,13 +26,18 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-        <!-- WebFlux：用于 WebClient 调用外部 LLM API，支持流式响应 -->
-        <!-- WebFlux：用于 WebClient 调用外部 LLM API，支持流式响应 -->
+        <!-- 支持 Controller 返回 Mono/Flux（如 /api/chat 返回 Mono） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
-        <!-- Jackson：解析 LLM 返回的 JSON（spring-boot-starter-web 已包含，此处显式声明便于学习） -->
+        <!-- LangChain4j：OpenAI 兼容 API（DeepSeek/通义等），同步与流式调用 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-open-ai</artifactId>
+            <version>1.11.0</version>
+        </dependency>
+        <!-- Jackson：解析 JSON（spring-boot-starter-web 已包含，此处显式声明便于学习） -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>

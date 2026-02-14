@@ -11,8 +11,9 @@
 | 缓存 | Redis | 6.x+ |
 | 向量检索 | Milvus / pgvector / Elasticsearch | - |
 | 文件存储 | 本地 / MinIO / OSS | - |
-| 大模型 | OpenAI API / 通义千问 / 文心一言 等 | 多模型抽象 |
+| 大模型 | LangChain4j + OpenAI 兼容 API（DeepSeek / 通义 / OpenAI 等） | LangChain4j 1.11 |
 | 文档解析 | Apache Tika / PDFBox | - |
+| 日志 | Logback（控制台 + 按日滚动文件） | - |
 
 ---
 
@@ -294,34 +295,25 @@ sequenceDiagram
 
 ## 6. 大模型接入抽象
 
-### 6.1 接口定义
+### 6.1 当前实现：LangChain4j
+
+当前后端使用 **LangChain4j**（`langchain4j-open-ai`）调用大模型：
+
+- **同步**：`ChatModel`（`OpenAiChatModel`）→ `LlmService.chat()` 返回 `Mono<String>`
+- **流式**：`StreamingChatModel`（`OpenAiStreamingChatModel`）→ `LlmService.chatStream()` 返回 `Flux<String>`，经 Controller 以 SSE 输出；每个 chunk 按 **JSON 字符串** 序列化后发送（如 `data: "你\n好"`），以便前端解析后保留换行，与 DeepSeek/OpenAI 流式 delta 中 `\n` 的语义一致。
+
+配置前缀为 `kindergarten.llm`（`base-url`、`api-key`、`model`），详见 [LLM_CONFIG.md](LLM_CONFIG.md)。DeepSeek/通义等兼容 API 已设置 `accumulateToolCallId(false)`。
+
+### 6.2 远期接口抽象（可选）
 
 ```java
 public interface LLMProvider {
-    // 同步调用
     String chat(List<ChatMessage> messages, ChatOptions options);
-    // 流式调用
     Flux<String> chatStream(List<ChatMessage> messages, ChatOptions options);
-}
-
-public interface ChatMessage {
-    String getRole();  // system / user / assistant
-    String getContent();
-}
-
-public interface ChatOptions {
-    String getModel();
-    Double getTemperature();
-    Integer getMaxTokens();
 }
 ```
 
-### 6.2 实现
-
-- `OpenAIProvider`：对接 OpenAI / 兼容 API
-- `QwenProvider`：通义千问
-- `WenxinProvider`：文心一言
-- 通过配置选择当前 Provider 和 model
+可在此基础上增加 `OpenAIProvider`、`QwenProvider`、`WenxinProvider` 等，通过配置切换。
 
 ### 6.3 重试与降级
 
@@ -378,7 +370,14 @@ file:
   max-size: 10485760  # 10MB
 ```
 
-### 8.3 启动顺序
+### 8.3 日志配置
+
+- 使用 **Logback**，配置文件：`src/main/resources/logback-spring.xml`。
+- 输出：**控制台** + **按日滚动文件**（默认路径：`${java.io.tmpdir}/kindergarten-agent/app.log`，可通过环境变量 `LOG_PATH` 或 `LOG_FILE` 覆盖）。
+- 保留 30 天历史（`app.log.yyyy-MM-dd.gz`）。
+- 本应用包名 `com.kindergarten` 与 `dev.langchain4j` 均为 INFO 级别，便于排查 LLM 调用。
+
+### 8.4 启动顺序
 
 1. MySQL / PostgreSQL、Redis、向量库、文件存储
 2. 应用服务

@@ -85,10 +85,8 @@ kindergarten-agent/
 - 可展示使用统计、推荐文案类型  
 
 **Chat**  
-- 左侧/顶部：文案类型选择（DocTypeSelector）  
-- 中央：MessageList + ChatInput  
-- 右侧/折叠：参数配置面板（年龄段、风格、字数、是否使用知识库）  
-- 支持新建会话、切换会话、删除会话  
+- 当前最简版：单栏布局，MessageList（消息气泡，支持换行与流式展示）+ ChatInput；消息正文使用 `pre-wrap` 保留换行、行高与字号便于阅读。  
+- 远期：左侧/顶部文案类型选择（DocTypeSelector）、中央 MessageList + ChatInput、右侧/折叠参数配置面板（年龄段、风格、字数、是否使用知识库）；新建/切换/删除会话。  
 
 **Knowledge**  
 - 上传区域（KnowledgeUpload）  
@@ -129,15 +127,17 @@ kindergarten-agent/
 
 **Props**：
 - `messages: Message[]`
-- `streamingContent?: string | null`   // 当前流式内容
+- `loading?: boolean`
+- `streamingContent?: string | null`   // 当前流式内容（可选，远期）
 - `onCopy?: (content: string) => void`
 - `onRegenerate?: (messageId: number) => void`
 
 **行为**：
-- 用户消息与助手消息区分展示
-- 助手消息支持复制、重新生成
-- 流式输出时展示打字机效果
-- 引用来源以折叠/脚注展示
+- 用户消息与助手消息区分展示（气泡样式、左右对齐）
+- **助手消息正文按 Markdown 渲染**（`react-markdown` + `remark-gfm`）：标题、加粗、列表、分隔线、引用、代码块等；用户消息为纯文本并保留换行（`white-space: pre-wrap`）
+- 助手消息支持复制、重新生成（远期）
+- 流式输出时展示打字机效果（当前实现：流式内容追加到最后一条 assistant 消息的 content）
+- 引用来源以折叠/脚注展示（远期）
 
 ### 4.3 DocTypeSelector
 
