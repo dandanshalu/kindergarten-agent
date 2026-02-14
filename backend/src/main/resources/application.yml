@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+# 幼儿园 Agent 应用配置
+kindergarten:
+  llm:
+    # DeepSeek API 地址（OpenAI 兼容），详见 docs/LLM_CONFIG.md
+    base-url: https://api.deepseek.com
+    # API Key，建议通过环境变量注入：KINDERGARTEN_LLM_API_KEY
+    api-key: sk-b20dca6b95f24e3abee227513ac00e3e
+    # 模型名称：deepseek-chat 对话，deepseek-reasoner 推理
+    model: deepseek-chat
