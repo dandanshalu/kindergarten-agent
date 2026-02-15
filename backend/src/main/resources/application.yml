@@ -36,7 +36,7 @@ kindergarten:
   llm:
     # DeepSeek API 地址（OpenAI 兼容），详见 docs/LLM_CONFIG.md
     base-url: https://api.deepseek.com
-    # API Key，建议通过环境变量注入：KINDERGARTEN_LLM_API_KEY
-    api-key: sk-501c98b46c084bf7972606e27b1a8b40
+    # API Key 仅通过环境变量注入，禁止在配置文件中明文填写（安全）
+    api-key: ${KINDERGARTEN_LLM_API_KEY:}
     # 模型名称：deepseek-chat 对话，deepseek-reasoner 推理
     model: deepseek-chat

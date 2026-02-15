@@ -17,27 +17,17 @@
 3. 进入「API Keys」创建密钥
 4. 复制密钥并妥善保存
 
-### 配置方式
+### 配置方式（仅环境变量）
 
-**方式一：环境变量（推荐）**
+API Key **禁止**写在配置文件或代码中，仅通过环境变量注入：
 
 ```bash
 export KINDERGARTEN_LLM_API_KEY=sk-xxxxxxxx
 ```
 
-**方式二：修改 application.yml**
+本地开发可在项目根目录或 `backend/` 下使用 `.env`（需自行 `source .env` 或由 IDE 加载），**.env 不要提交到 Git**，已在 `.gitignore` 中。
 
-编辑 `backend/src/main/resources/application.yml`：
-
-```yaml
-kindergarten:
-  llm:
-    base-url: https://api.deepseek.com
-    api-key: sk-xxxxxxxx    # 替换为你的 DeepSeek API Key
-    model: deepseek-chat
-```
-
-**注意**：不要将 API Key 提交到 Git。生产环境务必使用环境变量或密钥管理服务。
+未设置时应用启动会报错并提示设置 `KINDERGARTEN_LLM_API_KEY`。
 
 ---
 
@@ -77,15 +67,27 @@ kindergarten:
 
 ---
 
+## 安全说明：API Key 管理
+
+| 做法 | 说明 |
+|------|------|
+| ✅ 使用环境变量 | 通过 `KINDERGARTEN_LLM_API_KEY` 注入，不落盘、不进入 Git。 |
+| ✅ 生产/CI 使用密钥管理 | K8s Secret、Vault、云厂商密钥服务等，挂载为环境变量。 |
+| ❌ 不要写在 application.yml | 配置文件会进仓库，易泄露。当前配置已改为 `${KINDERGARTEN_LLM_API_KEY:}`，无默认值。 |
+| ❌ 不要提交 .env | 若用 .env 做本地开发，确保 `.env` 在 `.gitignore` 中且从未提交。 |
+| 泄露后 | 立即在对应平台（如 DeepSeek）撤销该 Key 并重新签发。 |
+
+---
+
 ## 配置项说明
 
 | 配置项 | 说明 | 示例 |
 |--------|------|------|
 | kindergarten.llm.base-url | LLM API 地址；LangChain4j 会自动在末尾补 `/v1`（若未带） | `https://api.deepseek.com` |
-| kindergarten.llm.api-key | API 密钥 | `sk-xxxx` |
+| kindergarten.llm.api-key | 仅通过环境变量 `${KINDERGARTEN_LLM_API_KEY}` 注入，不在配置中写明文 | — |
 | kindergarten.llm.model | 模型名称 | `deepseek-chat` |
 
-**说明**：`LlmConfig` 会据此创建 `OpenAiChatModel` 与 `OpenAiStreamingChatModel`，DeepSeek/通义等已设置 `accumulateToolCallId(false)`。
+**说明**：`LlmConfig` 会据此创建 `OpenAiChatModel` 与 `OpenAiStreamingChatModel`，DeepSeek/通义等已设置 `accumulateToolCallId(false)`。启动时若未设置 API Key 会直接失败并提示。
 
 ---
 
