@@ -1,12 +1,42 @@
 server:
   port: 8080
 
+spring:
+  application:
+    name: kindergarten-backend
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        # Nacos 连接未就绪时不阻塞启动，后台重试注册
+        fail-fast: false
+  datasource:
+    url: jdbc:h2:mem:kindergarten;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+  h2:
+    console:
+      enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+    database-platform: org.hibernate.dialect.H2Dialect
+
 # 幼儿园 Agent 应用配置
 kindergarten:
+  nacos:
+    # 延迟注册（ms），给 Nacos gRPC 客户端预留连接时间，避免 "Client not connected, current status:STARTING"
+    registration-delay-ms: ${NACOS_REGISTRATION_DELAY_MS:5000}
   llm:
     # DeepSeek API 地址（OpenAI 兼容），详见 docs/LLM_CONFIG.md
     base-url: https://api.deepseek.com
     # API Key，建议通过环境变量注入：KINDERGARTEN_LLM_API_KEY
-    api-key: sk-b20dca6b95f24e3abee227513ac00e3e
+    api-key: sk-501c98b46c084bf7972606e27b1a8b40
     # 模型名称：deepseek-chat 对话，deepseek-reasoner 推理
     model: deepseek-chat

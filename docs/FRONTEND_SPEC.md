@@ -217,7 +217,7 @@ interface SubscriptionState {
 
 ### 6.1 请求封装
 
-- 使用 `fetch` 或 `axios`，统一 baseURL
+- 使用 `fetch` 或 `axios`，统一 baseURL（开发时 Vite 代理 `/api` 到网关 9000，见 [GATEWAY.md](GATEWAY.md)）
 - 请求头自动注入 `Authorization: Bearer ${token}`
 - 401 时清空登录态并跳转登录页
 
@@ -298,7 +298,7 @@ location / {
 }
 
 location /api {
-  proxy_pass http://backend:8080;
+  proxy_pass http://gateway:9000;
   proxy_http_version 1.1;
   proxy_set_header Upgrade $http_upgrade;
   proxy_set_header Connection 'upgrade';

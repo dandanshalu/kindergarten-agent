@@ -11,6 +11,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/chat" replace />} />
         <Route path="/chat" element={<Chat />} />
+        <Route path="/chat/:sessionId" element={<Chat />} />
       </Routes>
     </BrowserRouter>
   );

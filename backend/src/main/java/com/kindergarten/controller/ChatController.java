@@ -4,7 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kindergarten.dto.ChatRequest;
 import com.kindergarten.dto.ChatResponse;
+import com.kindergarten.entity.Message;
 import com.kindergarten.service.LlmService;
+import com.kindergarten.service.SessionService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,17 +14,18 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 聊天 API 控制器。
  *
- * Agent 流程简述：
- * 1. 用户在前端输入消息 -> 2. 前端 POST /api/chat 或 /api/chat/stream
- * 3. 本控制器接收 -> 4. LlmService 转发给 LLM
- * 5. LLM 生成回复 -> 6. 同步接口一次性返回，流式接口通过 SSE 逐段推送
- *
- * 流式说明：SSE 规范中多行 data 会按行拆成多条，导致前端收到的 chunk 丢失换行。
- * 因此将每个 chunk 按 JSON 字符串序列化后发送，前端解析 JSON 后即可还原换行。
+ * 流程：
+ * 1. 解析/创建会话
+ * 2. 保存用户消息
+ * 3. 加载历史消息（含上下文）
+ * 4. 调用 LLM 生成
+ * 5. 保存助手消息
  */
 @RestController
 @RequestMapping("/api")
@@ -31,51 +34,104 @@ public class ChatController {
     private static final long SSE_TIMEOUT_MS = 90_000L;
 
     private final LlmService llmService;
+    private final SessionService sessionService;
     private final ObjectMapper objectMapper;
 
-    public ChatController(LlmService llmService, ObjectMapper objectMapper) {
+    public ChatController(LlmService llmService, SessionService sessionService, ObjectMapper objectMapper) {
         this.llmService = llmService;
+        this.sessionService = sessionService;
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * 同步聊天：用户发送消息，等待完整回复后返回。
-     */
-    @PostMapping(value = "/chat", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<ResponseEntity<ChatResponse>> chat(@RequestBody ChatRequest request) {
-        return llmService.chat(request.message())
-                .map(ChatResponse::new)
-                .map(ResponseEntity::ok)
-                .onErrorResume(e -> {
-                    var msg = "生成失败：" + (e.getMessage() != null ? e.getMessage() : "未知错误");
-                    return Mono.just(ResponseEntity.internalServerError()
-                            .body(new ChatResponse(msg)));
-                });
+    private long currentUserId() {
+        return SessionService.DEFAULT_USER_ID;
     }
 
     /**
-     * 流式聊天：chunk 以 JSON 字符串发送以保留换行（与 DeepSeek/OpenAI 流式 delta 语义一致）。
+     * 同步聊天
+     */
+    @PostMapping(value = "/chat", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Mono<ResponseEntity<ChatResponse>> chat(@RequestBody ChatRequest request) {
+        return Mono.fromCallable(() -> {
+            long sessionId = resolveSessionId(request.sessionId(), request.docTypeId());
+            sessionService.saveUserMessage(sessionId, currentUserId(), request.message());
+            var history = sessionService.getContextMessages(sessionId, currentUserId());
+            updateSessionTitleIfFirstMessage(sessionId, request.message(), history.size());
+            return new Object[] { sessionId, history };
+        })
+        .flatMap(tuple -> {
+            long sessionId = (Long) ((Object[]) tuple)[0];
+            @SuppressWarnings("unchecked")
+            List<Message> history = (List<Message>) ((Object[]) tuple)[1];
+            return llmService.chat(history)
+                    .map(reply -> {
+                        sessionService.saveAssistantMessage(sessionId, reply);
+                        return ResponseEntity.ok(new ChatResponse(reply, sessionId));
+                    });
+        })
+        .onErrorResume(e -> {
+            var msg = "生成失败：" + (e.getMessage() != null ? e.getMessage() : "未知错误");
+            return Mono.just(ResponseEntity.internalServerError().body(new ChatResponse(msg)));
+        });
+    }
+
+    /**
+     * 流式聊天：首条事件携带 sessionId，后续为 chunk。
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chatStream(@RequestBody ChatRequest request) {
         var emitter = new SseEmitter(SSE_TIMEOUT_MS);
-        llmService.chatStream(request.message())
-                .subscribe(
-                        chunk -> {
-                            try {
-                                String payload = objectMapper.writeValueAsString(chunk);
-                                emitter.send(payload);
-                            } catch (JsonProcessingException e) {
-                                throw new RuntimeException("序列化 chunk 失败", e);
-                            } catch (IOException e) {
-                                throw new RuntimeException(e);
-                            }
-                        },
-                        e -> emitter.completeWithError(e),
-                        emitter::complete
-                );
+        var fullReply = new AtomicReference<StringBuilder>(new StringBuilder());
+
+        try {
+            long sessionId = resolveSessionId(request.sessionId(), request.docTypeId());
+            sessionService.saveUserMessage(sessionId, currentUserId(), request.message());
+            var history = sessionService.getContextMessages(sessionId, currentUserId());
+            updateSessionTitleIfFirstMessage(sessionId, request.message(), history.size());
+
+            // 首条事件：会话 ID
+            emitter.send(objectMapper.writeValueAsString(new StreamSessionEvent(sessionId)));
+
+            llmService.chatStream(history).subscribe(
+                    chunk -> {
+                        try {
+                            fullReply.get().append(chunk);
+                            String payload = objectMapper.writeValueAsString(chunk);
+                            emitter.send(payload);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    },
+                    e -> emitter.completeWithError(e),
+                    () -> {
+                        try {
+                            sessionService.saveAssistantMessage(sessionId, fullReply.get().toString());
+                        } catch (Exception ignored) {}
+                        emitter.complete();
+                    }
+            );
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
         emitter.onTimeout(() -> emitter.complete());
         emitter.onError((e) -> {});
         return emitter;
     }
+
+    private long resolveSessionId(Long sessionId, String docTypeId) {
+        if (sessionId != null && sessionId > 0) {
+            var opt = sessionService.getSession(sessionId, currentUserId());
+            if (opt.isPresent()) return sessionId;
+        }
+        var s = sessionService.createSession(currentUserId(), "新对话", docTypeId != null ? docTypeId : "general");
+        return s.getId();
+    }
+
+    private void updateSessionTitleIfFirstMessage(long sessionId, String firstContent, int messageCount) {
+        if (messageCount != 1) return;
+        var title = sessionService.generateTitleFromFirstMessage(firstContent);
+        sessionService.updateSession(sessionId, currentUserId(), title);
+    }
+
+    private record StreamSessionEvent(long sessionId) {}
 }

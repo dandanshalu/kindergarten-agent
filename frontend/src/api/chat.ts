@@ -12,6 +12,7 @@ const API_BASE = '/api';
 
 export interface ChatRequest {
   message: string;
+  session_id?: number | null;
   doc_type_id?: string;
 }
 
@@ -39,6 +40,14 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
  * 后端为保留换行会将 chunk 按 JSON 字符串发送（如 data: "你\n好"），
  * 此处若为双引号包裹则 JSON.parse 还原，否则按原样返回。
  */
+function tryParseJson(s: string): unknown {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
 function parseSseDataLine(line: string): string | null {
   const trimmed = line.trim();
   if (!trimmed || !trimmed.startsWith('data:')) return null;
@@ -56,14 +65,17 @@ function parseSseDataLine(line: string): string | null {
 
 /**
  * 流式聊天：POST /api/chat/stream，通过 SSE 逐段接收内容。
+ * 首条事件可能为 { sessionId }，后续为 chunk 字符串。
  * @param request 请求体
- * @param onChunk 每收到一段内容时调用（一般为追加到当前回复）
+ * @param onSessionId 收到新会话 ID 时调用（可选）
+ * @param onChunk 每收到一段内容时调用
  * @param onDone 流结束或出错时调用
  */
 export function sendChatMessageStream(
   request: ChatRequest,
   onChunk: (chunk: string) => void,
-  onDone: (error?: Error) => void
+  onDone: (error?: Error) => void,
+  onSessionId?: (sessionId: number) => void
 ): void {
   fetch(`${API_BASE}/chat/stream`, {
     method: 'POST',
@@ -92,11 +104,25 @@ export function sendChatMessageStream(
           buffer = lines.pop() ?? '';
           for (const line of lines) {
             const data = parseSseDataLine(line);
-            if (data !== null) onChunk(data);
+            if (data !== null) {
+              const parsed = tryParseJson(data);
+              if (parsed && typeof parsed === 'object' && 'sessionId' in parsed) {
+                onSessionId?.(Number((parsed as { sessionId: number }).sessionId));
+              } else if (typeof data === 'string') {
+                onChunk(data);
+              }
+            }
           }
         }
         const data = parseSseDataLine(buffer);
-        if (data !== null) onChunk(data);
+        if (data !== null) {
+          const parsed = tryParseJson(data);
+          if (parsed && typeof parsed === 'object' && 'sessionId' in parsed) {
+            onSessionId?.(Number((parsed as { sessionId: number }).sessionId));
+          } else if (typeof data === 'string') {
+            onChunk(data);
+          }
+        }
       } finally {
         reader.releaseLock();
       }

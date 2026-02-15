@@ -5,6 +5,8 @@
 | 类别 | 技术选型 | 版本 |
 |------|----------|------|
 | 框架 | Spring Boot | 3.x |
+| 网关 | Spring Cloud Gateway | - |
+| 注册中心 | Nacos | 2.x |
 | 安全 | Spring Security + JWT | - |
 | 持久化 | Spring Data JPA | - |
 | 数据库 | MySQL / PostgreSQL | 8.x / 15.x |
@@ -28,11 +30,13 @@ flowchart TB
     end
 
     subgraph gateway [网关层]
-        API[Spring MVC API]
-        Auth[认证过滤器]
+        GW[Spring Cloud Gateway]
+        Nacos[(Nacos 注册中心)]
     end
 
-    subgraph services [服务层]
+    subgraph backend [后端服务 kindergarten-backend]
+        API[Spring MVC API]
+        Auth[认证过滤器]
         UserSvc[用户服务]
         SubSvc[订阅服务]
         KBSvc[知识库服务]
@@ -51,7 +55,9 @@ flowchart TB
         FileStore[(文件存储)]
     end
 
-    Web --> API
+    Web --> GW
+    GW --> Nacos
+    GW --> API
     API --> Auth
     Auth --> UserSvc
     Auth --> SubSvc
@@ -337,11 +343,17 @@ public interface LLMProvider {
 ### 8.1 部署架构建议
 
 ```
-[负载均衡] -> [应用实例 × N] -> [MySQL 主从] / [PostgreSQL]
-                          -> [Redis 集群]
-                          -> [向量库]
-                          -> [文件存储]
+[Web 前端] -> [Spring Cloud Gateway :9000] -> [kindergarten-backend :8080]
+                    |
+                    v
+              [Nacos :8848]
+                    |
+        [MySQL] [Redis] [向量库] [文件存储]
 ```
+
+- 前端请求统一经网关入口（默认端口 9000），网关按路由规则转发至后端服务
+- 后端服务注册到 Nacos，网关通过服务发现动态路由
+- 网关详细配置见 [GATEWAY.md](GATEWAY.md)
 
 ### 8.2 关键配置项
 
@@ -379,6 +391,9 @@ file:
 
 ### 8.4 启动顺序
 
-1. MySQL / PostgreSQL、Redis、向量库、文件存储
-2. 应用服务
-3. 如有定时任务（如用量统计、文件解析队列），一并启动
+1. Nacos 服务（默认 8848）
+2. MySQL / PostgreSQL、Redis、向量库、文件存储
+3. kindergarten-backend（8080）
+4. kindergarten-gateway（9000）
+5. 前端开发服务器或静态部署
+6. 如有定时任务（如用量统计、文件解析队列），一并启动

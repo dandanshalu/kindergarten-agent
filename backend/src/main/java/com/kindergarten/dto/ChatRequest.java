@@ -18,12 +18,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public record ChatRequest(
         String message,
+        @JsonProperty("session_id") Long sessionId,
         @JsonProperty("doc_type_id") String docTypeId
 ) {
     /**
-     * 紧凑构造器（Compact Constructor）：
-     * 在自动生成的构造器逻辑之后执行，可用于校验或规范化。
-     * 不需要写 this.message = message，Record 会自动完成字段赋值。
+     * 紧凑构造器（Compact Constructor）：校验 message 非空。
      */
     public ChatRequest {
         if (message == null || message.isBlank()) {
@@ -31,11 +30,7 @@ public record ChatRequest(
         }
     }
 
-    /**
-     * 若前端未传 docTypeId，提供默认值。
-     * 使用静态工厂方法，便于扩展更多默认逻辑。
-     */
     public static ChatRequest of(String message) {
-        return new ChatRequest(message, "general");
+        return new ChatRequest(message, null, "general");
     }
 }

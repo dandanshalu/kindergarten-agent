@@ -1,9 +1,5 @@
 /**
  * 消息类型定义。
- *
- * TypeScript 小知识：
- * - type 用于定义类型别名或联合类型
- * - interface 用于定义对象结构，二者在此场景可互换
  */
 export type MessageRole = 'user' | 'assistant';
 
@@ -12,4 +8,17 @@ export interface Message {
   role: MessageRole;
   content: string;
   createdAt?: string;
+}
+
+/**
+ * 会话类型定义。
+ */
+export interface Session {
+  id: number;
+  user_id: number;
+  title: string;
+  doc_type_id: string;
+  created_at: string;
+  updated_at: string;
+  messages?: Message[];
 }

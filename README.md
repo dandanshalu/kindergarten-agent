@@ -4,7 +4,8 @@
 
 ## 技术栈
 
-- **后端**：Java 21 + Spring Boot 3.2 + LangChain4j（调用 OpenAI 兼容 API，如 DeepSeek/通义）+ Logback（控制台 + 日志文件）
+- **后端**：Java 21 + Spring Boot 3.2 + LangChain4j（调用 OpenAI 兼容 API，如 DeepSeek/通义）+ Logback
+- **网关**：Spring Cloud Gateway + Nacos 注册中心
 - **前端**：React 18 + TypeScript + Vite + Ant Design 5
 
 ## 快速启动
@@ -14,26 +15,41 @@
 项目默认使用 DeepSeek，需配置 API Key。详见 [大模型底座配置说明](docs/LLM_CONFIG.md)。
 
 ```bash
-# 设置环境变量（推荐）
 export KINDERGARTEN_LLM_API_KEY=your-deepseek-api-key
-
-# 或在 backend/src/main/resources/application.yml 中修改
-kindergarten:
-  llm:
-    api-key: your-deepseek-api-key
 ```
 
-### 2. 启动后端
+### 2. 启动 Nacos（需先运行）
+
+```bash
+# Docker 方式（Apple Silicon 需加 --platform linux/amd64）
+docker run -d --platform linux/amd64 -p 8848:8848 -p 9848:9848 -p 9849:9849 \
+  -e MODE=standalone -e SPRING_DATASOURCE_PLATFORM=derby \
+  -v /Users/wxp/database/nacos/logs:/home/nacos/logs \
+  -v /Users/wxp/database/nacos/conf:/home/nacos/conf \
+  nacos/nacos-server:v2.2.3
+```
+
+详见 [网关说明](docs/GATEWAY.md)。
+
+### 3. 启动后端
 
 ```bash
 cd backend
-# 使用 JDK 21
-./mvnw spring-boot:run
+mvn spring-boot:run
 ```
 
-后端默认在 http://localhost:8080 启动。日志同时输出到控制台和按日滚动文件（默认路径：系统临时目录下的 `kindergarten-agent/app.log`，可通过环境变量 `LOG_PATH` 或 `LOG_FILE` 修改，详见 [后端技术规格](docs/BACKEND_SPEC.md) 第 8.3 节）。
+后端在 http://localhost:8080 启动，并注册到 Nacos。
 
-### 3. 启动前端
+### 4. 启动网关
+
+```bash
+cd gateway
+mvn spring-boot:run
+```
+
+网关在 http://localhost:9000 启动，将 `/api` 请求转发至后端。
+
+### 5. 启动前端
 
 ```bash
 cd frontend
@@ -41,9 +57,9 @@ npm install
 npm run dev
 ```
 
-前端默认在 http://localhost:5173 启动，通过 Vite 代理将 `/api` 请求转发到后端。
+前端在 http://localhost:5173 启动，通过 Vite 代理将 `/api` 请求转发到**网关**（9000）。
 
-### 4. 访问
+### 6. 访问
 
 在浏览器打开 http://localhost:5173 ，即可看到聊天页面并与大模型对话。
 
@@ -51,23 +67,27 @@ npm run dev
 
 ```
 kindergarten-agent/
-├── backend/                 # Java 后端
+├── pom.xml                  # 父 POM（Spring Cloud、Nacos 依赖管理）
+├── backend/                 # 后端服务 kindergarten-backend
 │   ├── src/main/java/com/kindergarten/
 │   │   ├── KindergartenAgentApplication.java
-│   │   ├── controller/      # API 控制器
-│   │   ├── dto/             # 请求/响应 DTO（使用 Java Record）
-│   │   ├── service/         # LLM 调用服务
-│   │   └── config/          # CORS、LangChain4j（LLM）等配置
+│   │   ├── controller/
+│   │   ├── dto/
+│   │   ├── entity/
+│   │   ├── repository/
+│   │   ├── service/
+│   │   └── config/
 │   └── src/main/resources/
-│       ├── application.yml
-│       └── logback-spring.xml   # 日志：控制台 + 按日滚动文件
+├── gateway/                 # 网关服务
+│   ├── src/main/java/com/kindergarten/gateway/
+│   └── src/main/resources/application.yml
 ├── frontend/                # React 前端
 │   └── src/
-│       ├── api/             # API 封装
-│       ├── components/      # ChatInput、MessageList
-│       ├── pages/           # Chat 页面
+│       ├── api/
+│       ├── components/
+│       ├── pages/
 │       └── types/
-├── docs/                    # 产品、前后端、测试文档
+├── docs/
 └── README.md
 ```
 
@@ -83,5 +103,6 @@ kindergarten-agent/
 | [docs/PRD.md](docs/PRD.md) | 产品需求文档 |
 | [docs/LLM_CONFIG.md](docs/LLM_CONFIG.md) | 大模型底座配置说明 |
 | [docs/BACKEND_SPEC.md](docs/BACKEND_SPEC.md) | 后端技术规格 |
+| [docs/GATEWAY.md](docs/GATEWAY.md) | 网关与 Nacos 说明 |
 | [docs/FRONTEND_SPEC.md](docs/FRONTEND_SPEC.md) | 前端技术规格 |
 | [docs/TEST_SPEC.md](docs/TEST_SPEC.md) | 测试规格 |

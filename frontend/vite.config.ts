@@ -13,10 +13,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    // 代理：开发时 /api 请求转发到后端 8080，解决跨域
+    // 代理：开发时 /api 请求经网关 9000 转发至后端，解决跨域
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:9000',
         changeOrigin: true,
       },
     },

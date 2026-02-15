@@ -1,0 +1,34 @@
+server:
+  port: 9000
+
+kindergarten:
+  nacos:
+    registration-delay-ms: ${NACOS_REGISTRATION_DELAY_MS:5000}
+
+spring:
+  application:
+    name: kindergarten-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        # Nacos 连接未就绪时不阻塞启动，后台重试注册
+        fail-fast: false
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: kindergarten-backend
+          uri: lb://kindergarten-backend
+          predicates:
+            - Path=/api/**
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"

@@ -1,8 +1,11 @@
 package com.kindergarten.service;
 
+import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
+
+import com.kindergarten.entity.Message;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -42,11 +45,12 @@ public class LlmService {
     }
 
     /**
-     * 同步聊天：一次性获取完整回复。
+     * 同步聊天：支持历史上下文。
+     * @param history 历史消息（含本次用户消息，按时间正序）
      */
-    public Mono<String> chat(String userMessage) {
-        List<ChatMessage> messages = buildMessages(userMessage);
-        log.info("LLM 同步请求, userMessage 长度: {}", userMessage != null ? userMessage.length() : 0);
+    public Mono<String> chat(java.util.List<Message> history) {
+        List<ChatMessage> messages = buildMessages(history);
+        log.info("LLM 同步请求, history 消息数: {}", history != null ? history.size() : 0);
         return Mono.fromCallable(() -> {
                     var response = chatModel.chat(messages);
                     String text = response.aiMessage() != null ? response.aiMessage().text() : null;
@@ -58,11 +62,12 @@ public class LlmService {
     }
 
     /**
-     * 流式聊天：通过 LangChain4j StreamingChatModel 逐 token 返回，封装为 Flux。
+     * 流式聊天：支持历史上下文。
+     * @param history 历史消息（含本次用户消息，按时间正序）
      */
-    public Flux<String> chatStream(String userMessage) {
-        List<ChatMessage> messages = buildMessages(userMessage);
-        log.info("LLM 流式请求, userMessage 长度: {}", userMessage != null ? userMessage.length() : 0);
+    public Flux<String> chatStream(java.util.List<Message> history) {
+        List<ChatMessage> messages = buildMessages(history);
+        log.info("LLM 流式请求, history 消息数: {}", history != null ? history.size() : 0);
         return Flux.<String>create(sink -> streamingChatModel.chat(messages, new StreamingChatResponseHandler() {
                     @Override
                     public void onPartialResponse(String partialResponse) {
@@ -86,10 +91,18 @@ public class LlmService {
                 .timeout(Duration.ofSeconds(90));
     }
 
-    private List<ChatMessage> buildMessages(String userMessage) {
-        return List.of(
-                new SystemMessage(SYSTEM_PROMPT),
-                new UserMessage(userMessage)
-        );
+    private List<ChatMessage> buildMessages(java.util.List<Message> history) {
+        var list = new java.util.ArrayList<ChatMessage>();
+        list.add(new SystemMessage(SYSTEM_PROMPT));
+        if (history != null) {
+            for (Message m : history) {
+                if (m.getRole() == Message.Role.user) {
+                    list.add(new UserMessage(m.getContent()));
+                } else if (m.getRole() == Message.Role.assistant) {
+                    list.add(new AiMessage(m.getContent()));
+                }
+            }
+        }
+        return list;
     }
 }
